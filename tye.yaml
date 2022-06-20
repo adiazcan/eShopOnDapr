@@ -1,0 +1,213 @@
+name: eShopOnDapr-application
+
+extensions:
+- name: dapr
+  components-path: ./dapr/components/
+  config: ./dapr/configuration/
+
+services:
+- name: basket-api
+  project: src/Services/Basket/Basket.API/Basket.API.csproj
+  bindings: 
+  - port: 5103
+    name: web
+    containerPort: 80
+  - port: 50001
+    name: health
+  env: 
+  - ASPNETCORE_ENVIRONMENT=Development
+  - ASPNETCORE_URLS=http://0.0.0.0:80
+  - IdentityUrl=http://identity-api
+  - IdentityUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5105
+  - SeqServerUrl=http://seq
+
+- name: blazor-client
+  project: src/Web/BlazorClient.Host/BlazorClient.Host.csproj
+  bindings: 
+  - port: 5104
+    name: web
+    containerPort: 80
+  env: 
+  - ASPNETCORE_ENVIRONMENT=Development
+  - ASPNETCORE_URLS=http://0.0.0.0:80
+  - ApiGatewayUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5202
+  - IdentityUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5105
+  - SeqServerUrl=http://seq
+
+- name: catalog-api
+  project: src/Services/Catalog/Catalog.API/Catalog.API.csproj
+  bindings:
+  - port: 5101
+    name: web
+    containerPort: 80
+  - port: 50002
+    name: health
+    containerPort: 50001
+  env: 
+  - ASPNETCORE_ENVIRONMENT=Development
+  - ASPNETCORE_URLS=http://0.0.0.0:80
+  - RetryMigrations=true
+  - SeqServerUrl=http://seq
+  - ConnectionStrings__CatalogDB=Server=sqldata;Database=Microsoft.eShopOnDapr.Services.CatalogDb;User Id=sa;Password=Pass@word;TrustServerCertificate=true
+
+- name: identity-api
+  project: src/Services/Identity/Identity.API/Identity.API.csproj
+  bindings: 
+  - port: 5105
+    name: web
+    containerPort: 80
+  - port: 50009
+    name: hc
+    containerPort: 50001
+  env: 
+  - ASPNETCORE_ENVIRONMENT=Development
+  - ASPNETCORE_URLS=http://0.0.0.0:80
+  - SeqServerUrl=http://seq
+  - RetryMigrations=true
+  - IssuerUrl=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5105
+  - BlazorClientUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5104
+  - BasketApiUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5103
+  - OrderingApiUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5102
+  - ShoppingAggregatorApiUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5121
+  - ConnectionStrings__IdentityDB=Server=sqldata;Database=Microsoft.eShopOnDapr.Service.IdentityDb;User Id=sa;Password=Pass@word;TrustServerCertificate=true
+
+
+- name: ordering-api
+  project: src/Services/Ordering/Ordering.API/Ordering.API.csproj
+  bindings: 
+  - port: 5102
+    name: web
+    containerPort: 80
+  - port: 50003
+    name: hc
+    containerPort: 50001
+  env: 
+  - ASPNETCORE_ENVIRONMENT=Development
+  - ASPNETCORE_URLS=http://0.0.0.0:80
+  - IdentityUrl=http://identity-api
+  - IdentityUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5105
+  - RetryMigrations=true
+  - SeqServerUrl=http://seq
+  - ConnectionStrings__OrderingDB=Server=sqldata;Database=Microsoft.eShopOnDapr.Services.OrderingDb;User Id=sa;Password=Pass@word;TrustServerCertificate=true
+
+
+- name: payment-api
+  project: src/Services/Payment/Payment.API/Payment.API.csproj
+  bindings:
+  - port: 5108
+    name: web
+    containerPort: 80
+  - port: 50006
+    name: hc
+    containerPort: 50001
+  env: 
+  - ASPNETCORE_ENVIRONMENT=Development
+  - ASPNETCORE_URLS=http://0.0.0.0:80
+  - SeqServerUrl=http://seq
+
+
+- name: webshoppingagg
+  project: src/ApiGateways/Aggregators/Web.Shopping.HttpAggregator/Web.Shopping.HttpAggregator.csproj
+  bindings:
+  - port: 5121
+    name: web
+    containerPort: 80
+  - port: 50007
+    name: hc
+    containerPort: 50001
+  env: 
+  - ASPNETCORE_ENVIRONMENT=Development
+  - IdentityUrl=http://identity-api
+  - IdentityUrlExternal=http://${ESHOP_EXTERNAL_DNS_NAME_OR_IP}:5105
+  - SeqServerUrl=http://seq
+  - BasketUrlHC=http://basket-api/hc
+  - CatalogUrlHC=http://catalog-api/hc
+  - IdentityUrlHC=http://identity-api/hc
+
+
+- name: webstatus
+  project: src/Web/WebStatus/WebStatus.csproj
+  bindings: 
+  - port: 5107
+    name: web
+    containerPort: 80
+  env: 
+  - ASPNETCORE_URLS=http://0.0.0.0:80
+  - HealthChecksUI__HealthChecks__0__Name=Basket API
+  - HealthChecksUI__HealthChecks__0__Uri=http://basket-api/hc
+  - HealthChecksUI__HealthChecks__1__Name=Catalog API
+  - HealthChecksUI__HealthChecks__1__Uri=http://catalog-api/hc
+  - HealthChecksUI__HealthChecks__2__Name=Identity API
+  - HealthChecksUI__HealthChecks__2__Uri=http://identity-api/hc
+  - HealthChecksUI__HealthChecks__3__Name=Ordering API
+  - HealthChecksUI__HealthChecks__3__Uri=http://ordering-api/hc
+  - HealthChecksUI__HealthChecks__4__Name=Payment API
+  - HealthChecksUI__HealthChecks__4__Uri=http://payment-api/hc
+  - HealthChecksUI__HealthChecks__5__Name=Web Shopping Aggregator
+  - HealthChecksUI__HealthChecks__5__Uri=http://webshoppingagg/hc
+  - HealthChecksUI__HealthChecks__6__Name=Blazor UI Host
+  - HealthChecksUI__HealthChecks__6__Uri=http://blazor-client/hc
+
+- name: webshoppingapigw
+  dockerFile: src/ApiGateways/Envoy/Dockerfile
+  bindings:
+  - port: 5202
+    name: web
+    containerPort: 80
+  - port: 15202
+    name: admin
+    containerPort: 8001
+  - port: 50008
+    name: hc
+    containerPort: 50001
+  env: 
+  - ENVOY_CATALOG_API_ADDRESS=catalog-api
+  - ENVOY_CATALOG_API_PORT=80
+  - ENVOY_ORDERING_API_ADDRESS=ordering-api
+  - ENVOY_ORDERING_API_PORT=80
+
+- name: maildev
+  image: maildev/maildev
+  bindings: 
+  - port: 5500
+    containerPort: 80
+    
+- name: rabbitmq
+  image: rabbitmq:3-management-alpine
+  bindings: 
+  - port: 5672
+
+- name: redis
+  image: redis:alpine
+  bindings:     
+  - port: 5379
+    containerPort: 6379
+
+- name: seq
+  image: datalust/seq:latest
+  bindings: 
+  - port: 5340
+    containerPort: 80
+  env: 
+  - name: ACCEPT_EULA
+    value: Y
+
+- name: sqldata
+  image: mcr.microsoft.com/azure-sql-edge
+  bindings: 
+  - port: 5433
+    containerPort: 1433
+  env: 
+  - name: SA_PASSWORD
+    value: Pass@word
+  - name: ACCEPT_EULA
+    value: Y
+  volumes: 
+  - source: eshop-sqldata
+    target: /var/opt/mssql
+
+- name: zipkin
+  image: openzipkin/zipkin-slim
+  bindings: 
+  - port: 5411
+    containerPort: 9411
